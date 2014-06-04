@@ -1,44 +1,41 @@
-set :domain, "ci.rademade.com"
-set :application, "wkhtmltopdf"
-set :deploy_to, "/var/www/wkhtmltopdf"
+# config valid only for Capistrano 3.1
+lock '3.2.1'
 
-set :user, "ci"
-set :use_sudo, false
+set :rvm_ruby_string, '2.0.0-p481'
+set :rvm_type, :system
+
+set :application, 'wkhtmltopdf'
+set :repo_url, 'git@github.com:Rademade/wkhtmltopdf-online.git'
+
+set :deploy_to, '/var/www/wkhtmltopdf'
 
 set :scm, :git
-set :repository,  "git@github.com:Rademade/wkhtmltopdf-online.git"
-set :branch, 'master'
-set :git_shallow_clone, 1
 
-role :web, domain
-role :app, domain
-role :db,  domain, :primary => true
+set :format, :pretty
 
-set :deploy_via, :remote_cache
+set :log_level, :info
+
+set :keep_releases, 3
 
 namespace :deploy do
-  task :start do ; end
-  task :stop do ; end
 
-  # Assumes you are using Passenger
-  task :restart, :roles => :app, :except => { :no_release => true } do
-    run "#{try_sudo} touch #{File.join(current_path,'tmp','restart.txt')}"
-  end
-
-  task :finalize_update, :except => { :no_release => true } do
-    run "chmod -R g+w #{latest_release}" if fetch(:group_writable, true)
-
-    # mkdir -p is making sure that the directories are there for some SCM's that don't save empty folders
-    run <<-CMD
-      rm -rf #{latest_release}/log &&
-      mkdir -p #{latest_release}/tmp &&
-      ln -s #{shared_path}/log #{latest_release}/log
-    CMD
-
-    if fetch(:normalize_asset_timestamps, true)
-      stamp = Time.now.utc.strftime("%Y%m%d%H%M.%S")
-      asset_paths = %w(images css).map { |p| "#{latest_release}/public/#{p}" }.join(" ")
-      run "find #{asset_paths} -exec touch -t #{stamp} {} ';'; true", :env => { "TZ" => "UTC" }
+  desc 'Restart application'
+  task :restart do
+    on roles(:app), in: :sequence, wait: 5 do
+      # Your restart mechanism here, for example:
+      # execute :touch, release_path.join('tmp/restart.txt')
     end
   end
+
+  after :publishing, :restart
+
+  after :restart, :clear_cache do
+    on roles(:web), in: :groups, limit: 3, wait: 10 do
+      # Here we can do anything such as:
+      # within release_path do
+      #   execute :rake, 'cache:clear'
+      # end
+    end
+  end
+
 end
